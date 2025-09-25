@@ -1,5 +1,5 @@
 {
-  "src": "data/src",
+  "src": "data",
   "binarized_lines": "data/binarized_lines",
   "binarized_lines_clean": "data/binarized_lines_clean",
   "augmented_lines": "data/augmented_lines",
