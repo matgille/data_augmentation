@@ -1,10 +1,10 @@
 import argparse
 import json
-from preprocessing import polygonExtraction
-from preprocessing import cleaner
-from preprocessing import augmentation
+from img_processing import polygonExtraction
+from img_processing import cleaner
+from img_processing import augmentation
 from scriptlevelaugICFHR2022 import script_aug
-from preprocessing import rebuild_pages
+from img_processing import rebuild_pages
 
 def load_config(path):
     with open(path) as f:
