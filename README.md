@@ -73,10 +73,16 @@ Create a virtual environment and Install dependencies using conda:
 
 # How to cite
 
-You can cite it using the CITATION.cff file or cite as following:
+You can cite it using the [CITATION.cff](cm.univ-tours.fr/cesr/prima/data_augmentation/-/blob/main/CITATION.cff) file or cite as following:
 
 ```bash
-Crespi, Serena Carlamaria, and Carlos Emiliano Gonzalez-Gallardo.
+Crespi, Serena Carlamaria, and Carlos Emiliano González-Gallardo.
 PRIMA HTR Augmentation Code. Version 1.0, 25 Sept. 2025,
 ERC PRIMA (hosted at CESR, Université de Tours), https://gitlab.com/cesr/prima/data_augmentation.
 ```
+
+
+# License & Attribution
+This script is provided freely for research and experimental use.
+It is part of the ongoing experiments and research conducted within the ERC PRIMA project (Grant No. 101142242), 
+by Serena Carlamaria Crespi and Carlos Emiliano González-Gallardo.
