@@ -20,7 +20,7 @@ a denoising phase and various augmentation techniques to create diverse and real
 ## How to Use
 
 1. **Prepare your input data**:
-   - Place `.png` or `.jpg` images and their corresponding `.xml` ALTO files in the `data/src` folder.
+   - Place `.png` or `.jpg` images and their corresponding `.xml` ALTO files in the `data` folder.
    - Each image must have a corresponding `.xml` file with the **same filename (excluding extension)**.
 
 
@@ -70,3 +70,13 @@ Create a virtual environment and Install dependencies using conda:
 - Augmentation is non-destructive: originals are copied as-is to the output folder.
 - Random operations are used for realism — each run will produce slightly different outputs.
 - Bézier augmentation's core is a fork from [script-level_aug_ICFHR2022](https://github.com/IMU-MachineLearningSXD/script-level_aug_ICFHR2022), which we adapted to work with historical documents.
+
+# How to cite
+
+You can cite it using the CITATION.cff file or cite as following:
+
+```bash
+Crespi, Serena Carlamaria, and Carlos Emiliano Gonzalez-Gallardo.
+PRIMA HTR Augmentation Code. Version 1.0, 25 Sept. 2025,
+ERC PRIMA (hosted at CESR, Université de Tours), https://gitlab.com/cesr/prima/data_augmentation.
+```
