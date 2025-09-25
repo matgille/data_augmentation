@@ -1,0 +1,31 @@
+{
+  "src": "data/src",
+  "binarized_lines": "data/binarized_lines",
+  "binarized_lines_clean": "data/binarized_lines_clean",
+  "augmented_lines": "data/augmented_lines",
+  "rebuilt_pages": "data/rebuilt_pages",
+  "augmented_pages": "data/augmented_pages",
+
+  "baseline_noise": 4,
+  "crop_margin_v": 5,
+  "crop_margin_h": 15,
+
+  "sauvola_window_size": 35,
+  "sauvola_k": 0.3,
+
+  "cleaner_min_area": 15,
+
+  "augmentation_k1": 0.1,
+  "augmentation_k2": 0.2,
+  "augmentation_stroke_radius": 4,
+
+  "augmentation_times": 4,
+  "augmentation_transform": "bezier",
+  "augmentation_deformation_strength": 0.1
+}
+
+
+
+
+
+
