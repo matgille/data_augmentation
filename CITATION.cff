@@ -1,0 +1,20 @@
+cff-version: 1.3.0
+message: "If you use this software, please cite it as below."
+title: PRIMA HTR Augmentation Code
+authors:
+  - given-names: Serena Carlamaria
+    family-names: Crespi
+  - given-names: Carlos Emiliano
+    family-names: González-Gallardo
+abstract: >
+  Codebase for preprocessing and data augmentation for historical Handwritten Text Recognition (HTR),
+  developed within ERC PRIMA, hosted at the Centre d'Études Supérieures de la Renaissance (CESR),
+  Université de Tours.
+keywords:
+  - HTR
+  - data augmentation
+  - manuscripts
+  - ERC PRIMA
+repository-code: https://gitlab.com/cesr/prima/data_augmentation
+url: https://gitlab.com/cesr/prima/data_augmentation
+license: MIT
