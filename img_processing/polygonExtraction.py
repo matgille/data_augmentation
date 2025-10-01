@@ -12,6 +12,57 @@ import re  # used by robust parse_polygon
 #     coords = polygon_str.strip().split()
 #     return [(int(float(coords[i])), int(float(coords[i + 1]))) for i in range(0, len(coords), 2)]
 
+def _mask_from_baseline(image_shape, baseline_points, thickness=9, dilation=1):
+    """
+    Build a narrow 'ribbon' mask along the baseline to isolate just the line.
+    thickness ~ line height/3; small dilation to include ascenders/descenders.
+    """
+    h, w = image_shape[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)
+    pts = np.array(baseline_points, dtype=np.int32).reshape(-1, 1, 2)
+    cv2.polylines(mask, [pts], isClosed=False, color=255, thickness=int(thickness))
+    if dilation > 0:
+        k = cv2.getStructuringElement(cv2.MORPH_RECT, (1 + 2*dilation, 1 + 2*dilation))
+        mask = cv2.dilate(mask, k, iterations=1)
+    return mask
+
+def extract_from_baseline_ribbon(image_bgr, baseline_points, args):
+    """
+    Crop using a 'ribbon' mask around the baseline (PAGE fallback when Coords are missing).
+    Applies Sauvola only inside the mask; outside -> white.
+    """
+    h, w = image_bgr.shape[:2]
+    thickness = int(getattr(args, "ribbon_thickness", 9))
+    dilation  = int(getattr(args, "ribbon_dilation", 1))
+    margin_v  = int(getattr(args, "crop_margin_v", 3))
+    margin_h  = int(getattr(args, "crop_margin_h", 4))
+
+    line_mask = _mask_from_baseline((h, w), baseline_points, thickness=thickness, dilation=dilation)
+
+    ys, xs = np.where(line_mask > 0)
+    if xs.size == 0 or ys.size == 0:
+        return None
+
+    x, y, bw, bh = cv2.boundingRect(np.column_stack((xs, ys)))
+    x0 = max(0, x - margin_h); y0 = max(0, y - margin_v)
+    x1 = min(w, x + bw + margin_h); y1 = min(h, y + bh + margin_v)
+    if x1 <= x0 or y1 <= y0:
+        return None
+
+    crop = image_bgr[y0:y1, x0:x1].copy()
+
+    # Shift mask to crop space + slight erosion to avoid halo borders
+    crop_mask = np.zeros((y1 - y0, x1 - x0), dtype=np.uint8)
+    crop_mask[line_mask[y0:y1, x0:x1] > 0] = 255
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
+    crop_mask = cv2.erode(crop_mask, kernel, iterations=1)
+
+    # Binarize only inside mask; outside -> white
+    return adaptive_binarize(crop, crop_mask,
+                             sauvola_window_size=getattr(args, "sauvola_window_size", 35),
+                             sauvola_k=getattr(args, "sauvola_k", 0.2),
+                             debug=False)
+
 # PAGE-ready parser: accepts "x,y x,y ..." and "x y x y ..."
 def parse_polygon(points_str):
     s = points_str.strip()
@@ -217,52 +268,37 @@ def _get_textline_polygons_alto(root):
                         polys.append(pts)
     return polys
 
-def _get_textline_polygons_page(root, baseline_half_thickness=10):
+def _get_textline_polygons_and_baselines_page(root):
     """
-    Extract TextLine polygons from PAGE:
-      - use TextLine->Coords@points when available,
-      - fallback: build a thin rectangle around Baseline if Coords are missing.
+    Return (polygons, baselines):
+      - polygons: list of Coords polygons (tight line shapes)
+      - baselines: list of baseline polylines (used only if Coords missing)
     """
-    polys = []
+    polys, baselines = [], []
     for el in root.iter():
-        if _localname(el.tag) == "TextLine":
-            coords = None
-            baseline = None
-            for ch in el:
-                ln = _localname(ch.tag)
-                if ln == "Coords" and ("points" in ch.attrib):
-                    coords = ch.attrib["points"]
-                elif ln == "Baseline" and ("points" in ch.attrib):
-                    baseline = ch.attrib["points"]
+        if _localname(el.tag) != "TextLine":
+            continue
+        coords = None
+        baseline = None
+        for ch in el:
+            ln = _localname(ch.tag)
+            if ln == "Coords" and ("points" in ch.attrib):
+                coords = ch.attrib["points"]
+            elif ln == "Baseline" and ("points" in ch.attrib):
+                baseline = ch.attrib["points"]
 
-            if coords:
-                pts = parse_polygon(coords)
-                if len(pts) >= 3:
-                    polys.append(pts)
-                    continue
+        if coords:
+            pts = parse_polygon(coords)
+            if len(pts) >= 3:
+                polys.append(pts)
+        elif baseline:
+            bpts = parse_polygon(baseline)
+            if len(bpts) >= 2:
+                baselines.append(bpts)
+    return polys, baselines
 
-            # Baseline fallback -> small rectangle band
-            if baseline:
-                bpts = parse_polygon(baseline)
-                if bpts:
-                    xs = [x for x, _ in bpts]
-                    ys = [y for _, y in bpts]
-                    minx, maxx = min(xs), max(xs)
-                    miny, maxy = min(ys), max(ys)
-                    top = miny - baseline_half_thickness
-                    bottom = maxy + baseline_half_thickness
-                    rect = [(minx, top), (maxx, top), (maxx, bottom), (minx, bottom)]
-                    polys.append(rect)
-    return polys
 
 def process_image(image_path, xml_path, output_dir, args):
-    """
-    Process a single image+xml pair:
-      - detect XML flavour (ALTO/PAGE),
-      - extract line polygons,
-      - crop each line using extract_polygon_gray,
-      - save one grayscale PNG per line.
-    """
     image = cv2.imread(str(image_path), cv2.IMREAD_COLOR)
     if image is None:
         print(f"Image not found: {image_path}")
@@ -273,23 +309,32 @@ def process_image(image_path, xml_path, output_dir, args):
 
     flavour = _get_xml_flavour(root)
     if flavour == "PAGE":
-        polygons = _get_textline_polygons_page(root)
+        polygons, baselines = _get_textline_polygons_and_baselines_page(root)
     else:
         polygons = _get_textline_polygons_alto(root)
+        baselines = []
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
     saved = 0
+    # 1) Tight Coords polygons (minimal noise)
     for i, points in enumerate(polygons):
-        # "version 2" crop: Sauvola only inside polygon, white outside
         cropped = extract_polygon_gray(image, points, args)
-
         if cropped is not None and cropped.size > 0:
-            out_path = output_dir / f"{image_path.stem}_line_{i:04}.png"
+            out_path = output_dir / f"{image_path.stem}_line_{saved:04}.png"
             cv2.imwrite(str(out_path), cropped)
             saved += 1
 
-    print(f"Processed {image_path.name} with {len(polygons)} lines, saved {saved}")
+    # 2) Fallback: baseline ribbon (when Coords missing)
+    for bpts in baselines:
+        cropped = extract_from_baseline_ribbon(image, bpts, args)
+        if cropped is not None and cropped.size > 0:
+            out_path = output_dir / f"{image_path.stem}_line_{saved:04}.png"
+            cv2.imwrite(str(out_path), cropped)
+            saved += 1
+
+    print(f"Processed {image_path.name} with {len(polygons)} polygons + {len(baselines)} baselines, saved {saved}")
+
 
 def polygon_extraction(args):
     """
