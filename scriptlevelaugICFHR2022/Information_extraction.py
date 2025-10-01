@@ -150,7 +150,7 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
         return list_total
 
     # ---------------------------
-    # Skeleton corner matching  ✅ (fixed indentation + robust behavior)
+    # Skeleton corner matching - fixed endpoints
     # ---------------------------
     def ske_cor_match(list_ske, list_cor):
         """
@@ -246,7 +246,7 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
         return list_total
 
     # ---------------------------
-    # Debug: visualize a problematic segment  ✅ (fixed indentation)
+    # Debug: visualize a problematic segment  
     # ---------------------------
     def show_segment_issue(list_ske, seg):
         # Create visualization image
