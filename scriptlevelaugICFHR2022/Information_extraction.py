@@ -103,23 +103,23 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
 
         # Next, directly select the center vertices of each subconnected domain.
         list_corner_new = []
-        for lst in list_total:
-            if len(lst) == 1:
-                list_corner_new.append(lst[0])
+        for list in list_total:
+            if len(list) == 1:
+                list_corner_new.append(list[0])
             else:
                 list_sort_a = []
                 list_sort_b = []
                 list_distance = []
-                for pt in lst:
+                for pt in list:
                     list_sort_a.append(pt[0])
                     list_sort_b.append(pt[1])
                 list_sort_a.sort()
                 list_sort_b.sort()
                 mid_a = (list_sort_a[0] + list_sort_a[-1]) / 2
                 mid_b = (list_sort_b[0] + list_sort_b[-1]) / 2
-                for pt in lst:
+                for pt in list:
                     list_distance.append(two_points_distance((mid_a, mid_b), pt))
-                list_corner_new.append(lst[list_distance.index(min(list_distance))])
+                list_corner_new.append(list[list_distance.index(min(list_distance))])
 
         return list_corner_new
 
@@ -149,109 +149,131 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
 
         return list_total
 
-    # ---------------------------
-    # Skeleton corner matching - fixed endpoints
-    # ---------------------------
+    # Skeleton corner matching
     def ske_cor_match(list_ske, list_cor):
-        """
-        Match skeleton segments to corner points.
-        Returns a list of items, each shaped as:
-          [ [end_pt1, end_pt2], [cor_pt1, cor_pt2], [segment_points] ]
-        """
+    
+    #Match skeleton stroke segments with their corresponding corner points.
+    #Handles both open strokes and closed-loop strokes (e.g., 'O').
+    #If a segment has no natural endpoints, a conservative cut is attempted.
+    #If the cut fails, the segment is skipped (kept unchanged elsewhere in pipeline).
+
         list_total = []
 
-        for seg in list_ske:
+        for segment in list_ske:
             list_integration = []
             list_endpoint = []
             list_corner = []
 
-            # Segment with >= 2 points
-            if len(seg) >= 2:
-                # Find endpoints: count neighbors in 8-neighborhood (endpoint => count == 2: self + 1 neighbor)
-                for pt in seg:
-                    count_branches = 0
+            # Segments with at least two skeleton points
+            if len(segment) >= 2:
+
+                # Identify true endpoints (degree = 1 in 8-neighborhood)
+                for pt in segment:
+                    neighbors = 0
                     for a in range(-1, 2):
                         for b in range(-1, 2):
-                            if (pt[0] + a, pt[1] + b) in seg:
-                                count_branches += 1
-                    if count_branches == 2:
+                            if (pt[0] + a, pt[1] + b) in segment:
+                                neighbors += 1
+                    if neighbors == 2:
                         list_endpoint.append(pt)
 
-                # No endpoints found: keep the segment and choose pseudo-endpoints (farthest pair)
+                # ---- CLOSED LOOP CASE (e.g., 'O') ----
                 if len(list_endpoint) == 0:
-                    print("No Endpoints on segment.. keeping segment with pseudo-endpoints")
-                    p1, p2, maxd = seg[0], seg[-1], -1.0
-                    for i in range(len(seg)):
-                        for j in range(i + 1, len(seg)):
-                            d = two_points_distance(seg[i], seg[j])
-                            if d > maxd:
-                                maxd = d
-                                p1, p2 = seg[i], seg[j]
-                    list_endpoint = [p1, p2]
-                elif len(list_endpoint) == 1:
-                    # If only one endpoint was found, duplicate it
-                    list_endpoint = [list_endpoint[0], list_endpoint[0]]
+                    print("No endpoints detected → segment may be a closed loop (e.g., 'O'). Attempting safe cut...")
 
-                # Match nearest corner to each endpoint (if no corners, use the endpoint itself)
-                list_integration.append(list_endpoint)
+                    # Choose a preferred cut location: closest to any existing corner, if available
+                    if list_cor:
+                        cut_pt = min(
+                            segment,
+                            key=lambda p: min(two_points_distance(p, c) for c in list_cor)
+                        )
+                    else:
+                        cut_pt = segment[len(segment) // 2]
+
+                    endpoints_after_cut = []
+                    segment_after_cut = segment
+
+                    # Attempt a conservative cut with increasing radius
+                    for cut_radius in (1, 2):
+                        cand = [
+                            p for p in segment
+                            if not (abs(p[0] - cut_pt[0]) <= cut_radius and abs(p[1] - cut_pt[1]) <= cut_radius)
+                        ]
+
+                        # Avoid overly destructive cuts
+                        if len(cand) < max(5, len(segment) - 4):
+                            continue
+
+                        eps = []
+                        for q in cand:
+                            neigh = 0
+                            for a in range(-1, 2):
+                                for b in range(-1, 2):
+                                    if (q[0] + a, q[1] + b) in cand:
+                                        neigh += 1
+                            if neigh == 2:
+                                eps.append(q)
+
+                        # Successful cut → use open segment
+                        if len(eps) >= 2:
+                            endpoints_after_cut = eps
+                            segment_after_cut = cand
+                            break
+
+                    # If cut worked, use resulting endpoints
+                    if len(endpoints_after_cut) >= 2:
+                        list_endpoint = endpoints_after_cut[:2]
+                        segment = segment_after_cut
+                    else:
+                        # If cut fails: skip deformation (but do NOT delete the letter)
+                        print("Cut failed → this stroke is kept unchanged (no deformation applied).")
+                        continue
+
+                # ---- Match nearest corner points ----
                 for pt_end in list_endpoint:
                     if list_cor:
-                        dists = [two_points_distance(pt_end, c) for c in list_cor]
-                        min_idx = dists.index(min(dists))
-                        list_corner.append(list_cor[min_idx])
+                        list_corner.append(
+                            min(list_cor, key=lambda c: two_points_distance(pt_end, c))
+                        )
                     else:
                         list_corner.append(pt_end)
 
-                list_integration.append(list_corner)
-                list_integration.append(seg)
-                list_total.append(list_integration)
-
-            # Segment with exactly 1 point
-            elif len(seg) == 1:
-                pt = seg[0]
-                list_endpoint = [pt, pt]
                 list_integration.append(list_endpoint)
-
-                if list_cor:
-                    dists = [two_points_distance(pt, c) for c in list_cor]
-                    d_sorted = sorted(((d, i) for i, d in enumerate(dists)))
-                    idx1 = d_sorted[0][1]
-                    idx2 = d_sorted[1][1] if len(d_sorted) > 1 else idx1
-                    list_integration.append([list_cor[idx1], list_cor[idx2]])
-                else:
-                    list_integration.append([pt, pt])
-
-                list_integration.append(seg)
+                list_integration.append(list_corner)
+                list_integration.append(segment)
                 list_total.append(list_integration)
 
-        # Remove already used corners (ignore duplicates safely)
-        used = []
-        for it in list_total:
-            for pt in it[1]:
-                used.append(pt)
-        for pt in set(used):
+            # Segments with exactly 1 skeleton point
+            elif len(segment) == 1:
+                pt = segment[0]
+                list_endpoint = [pt, pt]
+
+                if len(list_cor) >= 2:
+                    list_corner = sorted(list_cor, key=lambda c: two_points_distance(pt, c))[:2]
+                elif len(list_cor) == 1:
+                    list_corner = [list_cor[0], list_cor[0]]
+                else:
+                    list_corner = [pt, pt]
+
+                list_integration.append(list_endpoint)
+                list_integration.append(list_corner)
+                list_integration.append(segment)
+                list_total.append(list_integration)
+
+        # Remove corners that were already assigned
+        used = {pt for _, cors, _ in [(x[0], x[1], x[2]) for x in list_total] for pt in cors}
+        for pt in used:
             if pt in list_cor:
                 list_cor.remove(pt)
 
-        # Keep isolated corners as degenerate segments
-        if len(list_cor) != 0:
-            for pt in list_cor:
-                list_integration = []
-                list_endpoint = [pt, pt]
-                list_integration.append(list_endpoint)      # endpoints
-                list_integration.append(list_endpoint)      # corners (same)
-                list_integration.append([pt])               # segment points
-                list_total.append(list_integration)
-
         return list_total
 
-    # ---------------------------
-    # Debug: visualize a problematic segment  
-    # ---------------------------
-    def show_segment_issue(list_ske, seg):
-        # Create visualization image
-        x_coords = [pt[0] for segment in list_ske for pt in segment] + [pt[0] for pt in seg]
-        y_coords = [pt[1] for segment in list_ske for pt in segment] + [pt[1] for pt in seg]
+
+
+    def show_segment_issue(list_ske, list):
+    # Create visualization image
+        x_coords = [pt[0] for segment in list_ske for pt in segment] + [pt[0] for pt in list]
+        y_coords = [pt[1] for segment in list_ske for pt in segment] + [pt[1] for pt in list]
         width = max(x_coords) - min(x_coords) + 20
         height = max(y_coords) - min(y_coords) + 20
         debug_img = np.zeros((height, width, 3), dtype=np.uint8)
@@ -260,7 +282,7 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
             for pt in segment:
                 cv.circle(debug_img, pt, 1, (255, 0, 0), -1)
         # Draw current segment in red
-        for pt in seg:
+        for pt in list:
             cv.circle(debug_img, pt, 1, (0, 0, 255), -1)
         cv.imshow("Debug - No Endpoints", debug_img)
         cv.waitKey(0)
@@ -469,7 +491,7 @@ def information_extraction(src, k1_control_field_corner, k2_control_field_third_
                 for pt_cor in list_cor:
                     list_temp = copy.copy(list_cor_all)   # Copy the list of all corner points
                     list_temp.remove(pt_cor)  # Remove the currently iterated corner point from the list
-                    list_distance =  []  # Create a list to store distances between corner points
+                    list_distance = []  # Create a list to store distances between corner points
                     for pt_temp in list_temp:
                         list_distance.append(two_points_distance(pt_temp, pt_cor))
                     pt_corner_min_distance = list_temp[list_distance.index(min(list_distance))]   # Get the corner point closest to pt_cor
