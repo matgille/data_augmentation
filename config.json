@@ -1,5 +1,7 @@
 {
   "src": "data",
+  "data_root": "data",
+
   "binarized_lines": "data/binarized_lines",
   "binarized_lines_clean": "data/binarized_lines_clean",
   "augmented_lines": "data/augmented_lines",
@@ -23,9 +25,3 @@
   "augmentation_transform": "bezier",
   "augmentation_deformation_strength": 0.1
 }
-
-
-
-
-
-
