@@ -32,10 +32,21 @@ def main():
 
     script_aug.generate(args)
 
-    rebuild_pages.rebuild_pages_by_method(base_folder=args.augmented_lines,
-                                          data_folder=args.src,
-                                          output_folder=args.rebuilt_pages,
-                                          augmentations=args.augmentation_times)
+    # --- Backward compatibility between `data_root` (new) and `data_folder` (old) ---
+    data_root = getattr(args, 'data_root', None)
+    if data_root is None:
+        data_root = getattr(args, 'data_folder', None)
+    if data_root is None:
+        raise ValueError("Missing input root: provide `data_root` in config.json (or legacy `data_folder`).")
+
+    rebuild_pages.rebuild_pages_by_method(
+        base_folder=args.augmented_lines,
+        data_root=data_root,                
+        output_folder=args.rebuilt_pages,
+        augmentations=args.augmentation_times
+    )
+
+
 
 if __name__ == "__main__":
     main()
