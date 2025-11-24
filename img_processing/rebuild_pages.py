@@ -381,6 +381,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
         for f in flat_imgs:
             key = infer_page_key_from_filename(os.path.basename(f)) or "unknown_page"
             buckets[key].append(f)
+        print("Rebuilding pages")
         for key, files in buckets.items():
             files.sort()
             _rebuild_for_group(files, key)
