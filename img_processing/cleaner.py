@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 import matplotlib.pyplot as plt
+import tqdm
+import multiprocessing as mp
 
 def _ensure_binary_u8(img_gray):
     """
@@ -75,8 +77,34 @@ def show_comparison(original, cleaned):
     for ax in axes: ax.axis('off')
     plt.tight_layout(); plt.show()
 
+def clean_line(path, min_area, drop_border_touching, trim, preview, output_dir):
+    img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
+    if img is None:
+        print(f"Failed to read image: {path}")
+        return
+
+    # 1) binary normalization
+    img_bin = _ensure_binary_u8(img)
+
+    # 2) remove small components
+    cleaned = remove_small_components_soft(img_bin, min_area=min_area, debug=True)
+
+    # 3) optional: remove border-touching comps (useful for PAGE Baseline ribbon)
+    if drop_border_touching:
+        cleaned = _remove_border_touching_components(cleaned)
+
+    # 4) optional: trim white margins
+    if trim:
+        cleaned = _trim_white_margins(cleaned)
+
+    if preview:
+        show_comparison(img, cleaned)
+
+    output_path = output_dir / path.name  # keep same name
+    cv2.imwrite(str(output_path), cleaned)
+
 def clean_output_lines(input_dir, output_dir, min_area=15, preview=False,
-                       drop_border_touching=True, trim=True):
+                       drop_border_touching=True, trim=True, args=None):
     """
     Cleans all line images by:
       1) ensuring binary,
@@ -96,30 +124,10 @@ def clean_output_lines(input_dir, output_dir, min_area=15, preview=False,
         image_paths.extend(input_dir.glob(pat))
     image_paths = sorted(image_paths)
 
-    for path in image_paths:
-        img = cv2.imread(str(path), cv2.IMREAD_GRAYSCALE)
-        if img is None:
-            print(f"Failed to read image: {path}")
-            continue
-
-        # 1) binary normalization
-        img_bin = _ensure_binary_u8(img)
-
-        # 2) remove small components
-        cleaned = remove_small_components_soft(img_bin, min_area=min_area, debug=True)
-
-        # 3) optional: remove border-touching comps (useful for PAGE Baseline ribbon)
-        if drop_border_touching:
-            cleaned = _remove_border_touching_components(cleaned)
-
-        # 4) optional: trim white margins
-        if trim:
-            cleaned = _trim_white_margins(cleaned)
-
-        if preview:
-            show_comparison(img, cleaned)
-
-        output_path = output_dir / path.name  # keep same name
-        cv2.imwrite(str(output_path), cleaned)
+    data = [(path, min_area, drop_border_touching, trim, preview, output_dir) for path in image_paths]
+    with mp.Pool(processes=args.workers) as pool:
+        for _ in tqdm.tqdm(pool.starmap(clean_line, data),
+                           total=len(data)):
+            pass
 
     print(f"Cleaning complete: {len(image_paths)} images processed.")

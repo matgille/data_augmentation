@@ -28,7 +28,8 @@ def main():
     cleaner.clean_output_lines(input_dir=args.binarized_lines,
                                output_dir=args.binarized_lines_clean,
                                min_area=args.cleaner_min_area,
-                               preview=False)
+                               preview=False,
+                               args=args)
 
     script_aug.generate(args)
 
