@@ -2,6 +2,8 @@ import os
 import re
 from glob import glob
 from collections import defaultdict
+import multiprocessing as mp
+import tqdm
 
 import cv2
 import numpy as np
@@ -220,7 +222,8 @@ def update_page_with_augmented(tree, root, subdir):
 def rebuild_pages_by_method(base_folder="augmented_output",
                             data_root="data_root_with_many_manuscripts",
                             output_folder="rebuilt_pages",
-                            augmentations=4):
+                            augmentations=4,
+                            args=None):
     """
     Rebuild pages without mixing manuscripts:
     - If the structure is <base>/<method>/<page_key>/*, rebuild per page_key.
@@ -372,9 +375,11 @@ def rebuild_pages_by_method(base_folder="augmented_output",
         for f in flat_imgs:
             key = infer_page_key_from_filename(os.path.basename(f)) or "unknown_page"
             buckets[key].append(f)
-        for key, files in buckets.items():
-            files.sort()
-            _rebuild_for_group(files, key)
+        data = [(key, files) for key, files in buckets.items()]
+        with mp.Pool(processes=args.workers) as pool:
+            for _ in tqdm.tqdm(pool.starmap(_rebuild_for_group, data),
+                               total=len(data)):
+                pass
 
 
     def page_rebuild_subfolder(level1_path, page_key):
