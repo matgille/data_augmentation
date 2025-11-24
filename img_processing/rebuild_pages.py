@@ -226,6 +226,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
     - If the structure is <base>/<method>/<page_key>/*, rebuild per page_key.
     - Otherwise, partition files by page_key inside each subfolder and rebuild per group.
     """
+    print("Rebuilding pages.")
     os.makedirs(output_folder, exist_ok=True)
 
     # Level-1: methods (e.g., bezier, L2A, affine, perspective) or leaf dirs already containing images

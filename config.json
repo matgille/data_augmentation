@@ -1,6 +1,7 @@
 {
   "src": "data",
   "data_root": "data",
+  "workers": 100,
 
   "binarized_lines": "data/binarized_lines",
   "binarized_lines_clean": "data/binarized_lines_clean",

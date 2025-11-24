@@ -5,6 +5,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from skimage.filters import threshold_sauvola
 import re  # used by robust parse_polygon
+import multiprocessing as mp
+import tqdm
 
 
 # Previous simple version (kept here for reference)
@@ -349,10 +351,18 @@ def polygon_extraction(args):
     # Extend this list if you also use TIFF, etc.
     extensions = [".jpg", ".jpeg", ".png"]
 
-    for image_path in data_folder.iterdir():
-        if image_path.suffix.lower() in extensions and image_path.is_file():
-            xml_path = data_folder / f"{image_path.stem}.xml"
-            if xml_path.exists():
-                process_image(image_path, xml_path, output_folder, args)
-            else:
-                print(f"Missing XML for: {image_path.name}")
+    images = [(image_path, extension, data_folder, output_folder, args)
+              for image_path in data_folder.iterdir()]
+    with mp.Pool(processes=8) as pool:
+        for _ in tqdm.tqdm(pool.starmap(treat_image, images),
+                           total=len(images)):
+            pass
+
+
+def treat_image(image_path, extension, data_folder, output_folder, args):
+    if image_path.suffix.lower() in extensions and image_path.is_file():
+        xml_path = data_folder / f"{image_path.stem}.xml"
+        if xml_path.exists():
+            process_image(image_path, xml_path, output_folder, args)
+        else:
+            print(f"Missing XML for: {image_path.name}")

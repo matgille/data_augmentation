@@ -8,6 +8,8 @@ from scriptlevelaugICFHR2022.Information_extraction import information_extractio
 from scriptlevelaugICFHR2022.transformation import flag_judge, identify_reference_corner
 from scriptlevelaugICFHR2022.transformation import bezier_transformation, affine_transformation, L2A_transformation
 import matplotlib.pyplot as plt
+import multiprocessing as mp
+import tqdm
 
 def plot_test(input_img):
 
@@ -122,6 +124,35 @@ def new_local(src, times=1, stroke_radius=2, k1_control_field_corner=0.6,
         results.append(image)
     return results
 
+def treat_single_image(method_name, method_id, img_path, args):
+    output_subfolder = os.path.join(args.augmented_lines, method_name)
+    filename = os.path.basename(img_path)
+    if "_debug_overlay" in filename.lower():
+        return
+
+    gray = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
+
+    if gray is None:
+        print(f"Could not read: {img_path}")
+        return
+
+    _, binary = cv.threshold(gray, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
+    img_bgr = cv.cvtColor(binary, cv.COLOR_GRAY2BGR)
+
+    print(f"Processing: {filename} using {method_name} transformation")
+    augmented_list = new_local(img_bgr, times=args.augmentation_times,
+                               choice_mode=method_id,
+                               deformation_strength=args.augmentation_deformation_strength,
+                               stroke_radius=args.augmentation_stroke_radius,
+                               k1_control_field_corner=args.augmentation_k1,
+                               k2_control_field_third_bezier=args.augmentation_k2)
+
+    base_name = os.path.splitext(filename)[0]
+    for i, aug_img in enumerate(augmented_list):
+        save_name = f"{base_name}_{method_name}_{i + 1}.jpg"
+        save_path = os.path.join(output_subfolder, save_name)
+        cv.imwrite(save_path, aug_img)
+
 def generate(args):
 
     method_names = {"bezier": 1, "affine": 2, "L2A": 3, "perspective": 4}
@@ -136,32 +167,12 @@ def generate(args):
         image_paths += glob.glob(os.path.join(args.binarized_lines_clean, "**", "*.jpg"), recursive=True)
 
         image_paths.sort()
-        for img_path in image_paths:
-            filename = os.path.basename(img_path)
-            if "_debug_overlay" in filename.lower():
-                continue
+        max_workers = 8
 
-            gray = cv.imread(img_path, cv.IMREAD_GRAYSCALE)
-
-            if gray is None:
-                print(f"Could not read: {img_path}")
-                continue
-
-            _, binary = cv.threshold(gray, 0, 255, cv.THRESH_BINARY + cv.THRESH_OTSU)
-            img_bgr = cv.cvtColor(binary, cv.COLOR_GRAY2BGR)
-
-            print(f"Processing: {filename} using {method_name} transformation")
-            augmented_list = new_local(img_bgr, times=args.augmentation_times,
-                                       choice_mode=method_id,
-                                       deformation_strength=args.augmentation_deformation_strength,
-                                       stroke_radius=args.augmentation_stroke_radius,
-                                       k1_control_field_corner=args.augmentation_k1,
-                                       k2_control_field_third_bezier=args.augmentation_k2)
-
-            base_name = os.path.splitext(filename)[0]
-            for i, aug_img in enumerate(augmented_list):
-                save_name = f"{base_name}_{method_name}_{i+1}.jpg"
-                save_path = os.path.join(output_subfolder, save_name)
-                cv.imwrite(save_path, aug_img)
+        with mp.Pool(processes=max_workers) as pool:
+            data = [(method_name, method_id, img_path, args) for img_path in image_paths]
+            for _ in tqdm.tqdm(pool.starmap(treat_single_image, data),
+                               total=len(data)):
+                pass
 
     print("✅ Done. Output salvato in:", args.augmented_lines)

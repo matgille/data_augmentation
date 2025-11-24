@@ -4,7 +4,8 @@ import numpy as np
 import lxml.etree as ET  # Faster XML parsing
 import shutil
 import random
-from tqdm import tqdm
+import multiprocessing as mp
+import tqdm
 
 def apply_bleeding_effect(image, blur_strength=15, stretch_factor=1.2, alpha=0.4):
     """ Simulates ink bleeding effect by blurring and stretching the image slightly. """
@@ -52,6 +53,7 @@ def apply_random_shadow(image):
 
 def process_image(file_name, args):
     """ Processes a single image and its corresponding ALTO XML file, applying augmentations. """
+    print(f"Processing {file_name}")
     img_path = os.path.join(args.src, file_name)
     xml_path = os.path.join(args.src, os.path.splitext(file_name)[0] + ".xml")
     
@@ -105,9 +107,12 @@ def process_image(file_name, args):
 def augmentation(args):
     """ Main function to start the data augmentation process. """
     os.makedirs(args.augmented_pages, exist_ok=True)  # Ensure the output directory exists
-    files = [f for f in os.listdir(args.src) if f.lower().endswith((".png", ".jpg"))]
-    for file_name in tqdm(files, desc="Processing images"):
-        process_image(file_name, args)
+    files = [(f, args) for f in os.listdir(args.src) if f.lower().endswith((".png", ".jpg"))]
+    with mp.Pool(processes=8) as pool:
+        for _ in tqdm.tqdm(pool.starmap(process_image, files),
+                           total=len(files)):
+			pass
+
     print(f"Data augmentation completed! Augmented data saved in {args.augmented_pages}")
 
 
