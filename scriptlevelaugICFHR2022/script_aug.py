@@ -167,9 +167,8 @@ def generate(args):
         image_paths += glob.glob(os.path.join(args.binarized_lines_clean, "**", "*.jpg"), recursive=True)
 
         image_paths.sort()
-        max_workers = 8
 
-        with mp.Pool(processes=max_workers) as pool:
+        with mp.Pool(processes=args.workers) as pool:
             data = [(method_name, method_id, img_path, args) for img_path in image_paths]
             for _ in tqdm.tqdm(pool.starmap(treat_single_image, data),
                                total=len(data)):

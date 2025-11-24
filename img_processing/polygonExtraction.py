@@ -353,7 +353,7 @@ def polygon_extraction(args):
 
     images = [(image_path, extension, data_folder, output_folder, args)
               for image_path in data_folder.iterdir()]
-    with mp.Pool(processes=8) as pool:
+    with mp.Pool(processes=args.workers) as pool:
         for _ in tqdm.tqdm(pool.starmap(treat_image, images),
                            total=len(images)):
             pass

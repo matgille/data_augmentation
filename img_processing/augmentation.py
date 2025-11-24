@@ -108,7 +108,7 @@ def augmentation(args):
     """ Main function to start the data augmentation process. """
     os.makedirs(args.augmented_pages, exist_ok=True)  # Ensure the output directory exists
     files = [(f, args) for f in os.listdir(args.src) if f.lower().endswith((".png", ".jpg"))]
-    with mp.Pool(processes=8) as pool:
+    with mp.Pool(processes=args.workers) as pool:
         for _ in tqdm.tqdm(pool.starmap(process_image, files),
                            total=len(files)):
 			pass
