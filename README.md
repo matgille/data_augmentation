@@ -1,3 +1,5 @@
+[! Forked from https://scm.univ-tours.fr/cesr/prima/data_augmentation]
+
 # 🖋️ Low-Cost Synthetic Data Generation for HTR Training: Evaluating a Multimodal Strategy for Historical Manuscript Processing
 
 This tool performs **data augmentation on historical document images** (e.g., manuscript scans) and their corresponding **ALTO XML** files. It incorporates both
