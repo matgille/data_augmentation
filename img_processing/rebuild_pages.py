@@ -303,7 +303,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
                     return ln
                 return None  # not plausible
 
-            for augmentation_index in range(augmentations):
+            def treat_augmentation(augmentation_index):
                 canvas = np.full((H, W, 3), 255, dtype=np.uint8)
 
                 # Try direct placement by line index first, then fall back to sequential fill
@@ -359,6 +359,14 @@ def rebuild_pages_by_method(base_folder="augmented_output",
                 xml_tree.write(xml_out, encoding="utf-8", xml_declaration=True)
 
                 print(f"[OK] Page rebuilt '{page_key_label}' from '{level1}': {img_out} , {xml_out}")
+
+            data = [item for item in range(augmentations)]
+            print(data)
+            exit(0)
+            with mp.Pool(processes=args.workers) as pool:
+                for _ in tqdm.tqdm(pool.starmap(treat_augmentation, data),
+                                   total=len(data)):
+                    pass
 
 
         # ===== CASE A: there are page_key subfolders =====
