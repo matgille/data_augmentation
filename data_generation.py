@@ -23,15 +23,15 @@ def main():
     # augmentation.augmentation(args)
 
 
-    polygonExtraction.polygon_extraction(args)
+    # polygonExtraction.polygon_extraction(args)
 
-    cleaner.clean_output_lines(input_dir=args.binarized_lines,
-                               output_dir=args.binarized_lines_clean,
-                               min_area=args.cleaner_min_area,
-                               preview=False,
-                               args=args)
+    # cleaner.clean_output_lines(input_dir=args.binarized_lines,
+    #                            output_dir=args.binarized_lines_clean,
+    #                            min_area=args.cleaner_min_area,
+    #                            preview=False,
+    #                            args=args)
 
-    script_aug.generate(args)
+    # script_aug.generate(args)
 
     # --- Backward compatibility between `data_root` (new) and `data_folder` (old) ---
     data_root = getattr(args, 'data_root', None)
@@ -44,7 +44,8 @@ def main():
         base_folder=args.augmented_lines,
         data_root=data_root,                
         output_folder=args.rebuilt_pages,
-        augmentations=args.augmentation_times
+        augmentations=args.augmentation_times,
+        args=args
     )
 
 
