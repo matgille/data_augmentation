@@ -20,18 +20,18 @@ def main():
     parser.set_defaults(**config)
     args = parser.parse_args()
 
-    # augmentation.augmentation(args)
+    augmentation.augmentation(args)
 
 
-    # polygonExtraction.polygon_extraction(args)
+    polygonExtraction.polygon_extraction(args)
 
-    # cleaner.clean_output_lines(input_dir=args.binarized_lines,
-    #                            output_dir=args.binarized_lines_clean,
-    #                            min_area=args.cleaner_min_area,
-    #                            preview=False,
-    #                            args=args)
+    cleaner.clean_output_lines(input_dir=args.binarized_lines,
+                               output_dir=args.binarized_lines_clean,
+                               min_area=args.cleaner_min_area,
+                               preview=False,
+                               args=args)
 
-    # script_aug.generate(args)
+    script_aug.generate(args)
 
     # --- Backward compatibility between `data_root` (new) and `data_folder` (old) ---
     data_root = getattr(args, 'data_root', None)
