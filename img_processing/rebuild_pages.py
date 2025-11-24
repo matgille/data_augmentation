@@ -378,7 +378,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
         for f in flat_imgs:
             key = infer_page_key_from_filename(os.path.basename(f)) or "unknown_page"
             buckets[key].append(f)
-        data = [(key, files) for key, files in buckets.items()]
+        data = [(files, key, data_root, output_folder, level1, augmentations) for key, files in buckets.items()]
         with mp.Pool(processes=args.workers) as pool:
             for _ in tqdm.tqdm(pool.starmap(_rebuild_for_group, data),
                                total=len(data)):
