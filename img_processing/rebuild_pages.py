@@ -10,6 +10,116 @@ import numpy as np
 import xml.etree.ElementTree as ET
 
 # ---------- helpers you already had (kept) ----------
+
+# Helper: rebuild for a group of files that all belong to the same page_key
+def _rebuild_for_group(image_files, page_key_label, data_root, output_folder, level1, augmentations):
+    if not image_files:
+        return
+
+    # Find XML + original page image for this page_key
+    xml_path, original_image_path = find_source_xml_and_image(data_root, page_key_label)
+    if not xml_path or not original_image_path:
+        print(f"[WARN] No XML/image for page_key '{page_key_label}' under '{data_root}'. Skip.")
+        return
+
+    original_image = cv2.imread(original_image_path, cv2.IMREAD_COLOR)
+    if original_image is None:
+        print(f"[WARN] Cannot read source image: {original_image_path}. Skip.")
+        return
+    H, W = original_image.shape[:2]
+
+    # Parse line bounding boxes from XML
+    tree0 = ET.parse(xml_path)
+    root0 = tree0.getroot()
+    flavour = _detect_flavour(root0)
+    if flavour == "PAGE":
+        _, _, boxes = parse_page_xml(xml_path)
+    else:
+        _, _, boxes = parse_alto_xml(xml_path)
+
+    if not boxes:
+        print(f"[WARN] No line bboxes in '{xml_path}'. Skip.")
+        return
+
+    # Group by line number inferred from filename
+    grouped_by_line = defaultdict(list)
+    for f in image_files:
+        ln = extract_line_number(os.path.basename(f))
+        grouped_by_line[ln].append(f)
+    for ln in grouped_by_line:
+        grouped_by_line[ln].sort()
+    sorted_line_numbers = sorted(grouped_by_line.keys())
+
+    # Prepare output: separate per method/page_key
+    out_dir = os.path.join(output_folder, f"{level1}_{page_key_label}")
+    os.makedirs(out_dir, exist_ok=True)
+
+
+
+    # Map “line_xxxx” to bbox index when plausible
+    # Common assumption: line_0000 → boxes[0], line_0001 → boxes[1], ...
+    def _bbox_index_for_line(ln):
+        if ln != float('inf') and 0 <= ln < len(boxes):
+            return ln
+        return None  # not plausible
+
+    for augmentation_index in range(augmentations):
+        canvas = np.full((H, W, 3), 255, dtype=np.uint8)
+
+        # Try direct placement by line index first, then fall back to sequential fill
+        used_boxes = set()
+
+        # 1) Direct placement: use the same index as in filename if plausible
+        for ln in sorted_line_numbers:
+            idx = _bbox_index_for_line(ln)
+            if idx is None or idx in used_boxes:
+                continue
+            files_for_line = grouped_by_line[ln]
+            if augmentation_index >= len(files_for_line):
+                continue
+            x, y, w, h, _ = boxes[idx]
+            line_img = cv2.imread(files_for_line[augmentation_index], cv2.IMREAD_COLOR)
+            if line_img is None:
+                continue
+            _paste_line_safe(canvas, x, y, w, h, line_img)
+            used_boxes.add(idx)
+
+        # 2) Fallback: for lines without a valid index, place them in remaining boxes sequentially
+        seq_boxes = [i for i in range(len(boxes)) if i not in used_boxes]
+        seq_ptr = 0
+        for ln in sorted_line_numbers:
+            if _bbox_index_for_line(ln) is not None:
+                continue  # already placed above
+            if seq_ptr >= len(seq_boxes):
+                break
+            files_for_line = grouped_by_line[ln]
+            if augmentation_index >= len(files_for_line):
+                continue
+            idx = seq_boxes[seq_ptr]
+            seq_ptr += 1
+            x, y, w, h, _ = boxes[idx]
+            line_img = cv2.imread(files_for_line[augmentation_index], cv2.IMREAD_COLOR)
+            if line_img is None:
+                continue
+            _paste_line_safe(canvas, x, y, w, h, line_img)
+
+        # Save rebuilt image
+        img_out = os.path.join(out_dir, f"reconstructed_{page_key_label}_{augmentation_index + 1}.png")
+        cv2.imwrite(img_out, canvas)
+
+        # Save a fresh XML annotated with the reconstruction marker
+        xml_tree = ET.parse(xml_path)
+        xml_root = xml_tree.getroot()
+        _register_default_and_common_ns(xml_root)
+        if flavour == "PAGE":
+            xml_tree = update_page_with_augmented(xml_tree, xml_root, page_key_label)
+        else:
+            xml_tree = update_alto_with_augmented(xml_tree, xml_root, page_key_label)
+        xml_out = os.path.join(out_dir, f"reconstructed_{page_key_label}_{augmentation_index + 1}.xml")
+        xml_tree.write(xml_out, encoding="utf-8", xml_declaration=True)
+
+        print(f"[OK] Page rebuilt '{page_key_label}' from '{level1}': {img_out} , {xml_out}")
+
 def extract_line_number(filename: str):
     m = re.search(r'line[_\-]?(\d+)', filename)
     return int(m.group(1)) if m else float('inf')
@@ -242,114 +352,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
         subfolders = [d for d in os.listdir(level1_path)
                       if os.path.isdir(os.path.join(level1_path, d))]
 
-        # Helper: rebuild for a group of files that all belong to the same page_key
-        def _rebuild_for_group(image_files, page_key_label):
-            if not image_files:
-                return
 
-            # Find XML + original page image for this page_key
-            xml_path, original_image_path = find_source_xml_and_image(data_root, page_key_label)
-            if not xml_path or not original_image_path:
-                print(f"[WARN] No XML/image for page_key '{page_key_label}' under '{data_root}'. Skip.")
-                return
-
-            original_image = cv2.imread(original_image_path, cv2.IMREAD_COLOR)
-            if original_image is None:
-                print(f"[WARN] Cannot read source image: {original_image_path}. Skip.")
-                return
-            H, W = original_image.shape[:2]
-
-            # Parse line bounding boxes from XML
-            tree0 = ET.parse(xml_path)
-            root0 = tree0.getroot()
-            flavour = _detect_flavour(root0)
-            if flavour == "PAGE":
-                _, _, boxes = parse_page_xml(xml_path)
-            else:
-                _, _, boxes = parse_alto_xml(xml_path)
-
-            if not boxes:
-                print(f"[WARN] No line bboxes in '{xml_path}'. Skip.")
-                return
-
-            # Group by line number inferred from filename
-            grouped_by_line = defaultdict(list)
-            for f in image_files:
-                ln = extract_line_number(os.path.basename(f))
-                grouped_by_line[ln].append(f)
-            for ln in grouped_by_line:
-                grouped_by_line[ln].sort()
-            sorted_line_numbers = sorted(grouped_by_line.keys())
-
-            # Prepare output: separate per method/page_key
-            out_dir = os.path.join(output_folder, f"{level1}_{page_key_label}")
-            os.makedirs(out_dir, exist_ok=True)
-
-
-
-            # Map “line_xxxx” to bbox index when plausible
-            # Common assumption: line_0000 → boxes[0], line_0001 → boxes[1], ...
-            def _bbox_index_for_line(ln):
-                if ln != float('inf') and 0 <= ln < len(boxes):
-                    return ln
-                return None  # not plausible
-
-            for augmentation_index in range(augmentations):
-                canvas = np.full((H, W, 3), 255, dtype=np.uint8)
-
-                # Try direct placement by line index first, then fall back to sequential fill
-                used_boxes = set()
-
-                # 1) Direct placement: use the same index as in filename if plausible
-                for ln in sorted_line_numbers:
-                    idx = _bbox_index_for_line(ln)
-                    if idx is None or idx in used_boxes:
-                        continue
-                    files_for_line = grouped_by_line[ln]
-                    if augmentation_index >= len(files_for_line):
-                        continue
-                    x, y, w, h, _ = boxes[idx]
-                    line_img = cv2.imread(files_for_line[augmentation_index], cv2.IMREAD_COLOR)
-                    if line_img is None:
-                        continue
-                    _paste_line_safe(canvas, x, y, w, h, line_img)
-                    used_boxes.add(idx)
-
-                # 2) Fallback: for lines without a valid index, place them in remaining boxes sequentially
-                seq_boxes = [i for i in range(len(boxes)) if i not in used_boxes]
-                seq_ptr = 0
-                for ln in sorted_line_numbers:
-                    if _bbox_index_for_line(ln) is not None:
-                        continue  # already placed above
-                    if seq_ptr >= len(seq_boxes):
-                        break
-                    files_for_line = grouped_by_line[ln]
-                    if augmentation_index >= len(files_for_line):
-                        continue
-                    idx = seq_boxes[seq_ptr]
-                    seq_ptr += 1
-                    x, y, w, h, _ = boxes[idx]
-                    line_img = cv2.imread(files_for_line[augmentation_index], cv2.IMREAD_COLOR)
-                    if line_img is None:
-                        continue
-                    _paste_line_safe(canvas, x, y, w, h, line_img)
-
-                # Save rebuilt image
-                img_out = os.path.join(out_dir, f"reconstructed_{page_key_label}_{augmentation_index + 1}.png")
-                cv2.imwrite(img_out, canvas)
-
-                # Save a fresh XML annotated with the reconstruction marker
-                xml_tree = ET.parse(xml_path)
-                xml_root = xml_tree.getroot()
-                _register_default_and_common_ns(xml_root)
-                if flavour == "PAGE":
-                    xml_tree = update_page_with_augmented(xml_tree, xml_root, page_key_label)
-                else:
-                    xml_tree = update_alto_with_augmented(xml_tree, xml_root, page_key_label)
-                xml_out = os.path.join(out_dir, f"reconstructed_{page_key_label}_{augmentation_index + 1}.xml")
-                xml_tree.write(xml_out, encoding="utf-8", xml_declaration=True)
-
-                print(f"[OK] Page rebuilt '{page_key_label}' from '{level1}': {img_out} , {xml_out}")
 
 
         # ===== CASE A: there are page_key subfolders =====
