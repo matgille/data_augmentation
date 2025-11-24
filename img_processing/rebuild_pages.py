@@ -361,8 +361,6 @@ def rebuild_pages_by_method(base_folder="augmented_output",
                 print(f"[OK] Page rebuilt '{page_key_label}' from '{level1}': {img_out} , {xml_out}")
 
             data = [item for item in range(augmentations)]
-            print(data)
-            exit(0)
             with mp.Pool(processes=args.workers) as pool:
                 for _ in tqdm.tqdm(pool.starmap(treat_augmentation, data),
                                    total=len(data)):
