@@ -11,17 +11,17 @@ def apply_bleeding_effect(image, blur_strength=15, stretch_factor=1.2, alpha=0.4
     """ Simulates ink bleeding effect by blurring and stretching the image slightly. """
     flipped = cv2.flip(image, 1)  # Mirror flip
     blurred = cv2.GaussianBlur(flipped, (blur_strength, blur_strength), blur_strength // 3)
-    
+
     h, w = blurred.shape[:2]
     stretched = cv2.resize(blurred, (w, int(h * stretch_factor)))
     resized = cv2.resize(stretched, (w, h))
-    
+
     return cv2.addWeighted(image.astype(np.float32), 1 - alpha, resized.astype(np.float32), alpha, 0).astype(np.uint8)
 
 def apply_morphological_transforms(image):
     """ Applies random morphological transformations such as dilation, erosion, and blurring. """
     kernel = np.ones((2, 2), np.uint8)
-    
+
     if random.random() < 0.5:
         image = cv2.dilate(image, kernel, iterations=random.randint(1, 3))  # Thickens text
     if random.random() < 0.5:
@@ -30,14 +30,14 @@ def apply_morphological_transforms(image):
         image = cv2.GaussianBlur(image, (3, 3), 0)  # Slight blurring
     if random.random() < 0.5:
         image = cv2.morphologyEx(image, cv2.MORPH_OPEN, kernel)  # Simulate worn-out characters
-    
+
     return image
 
 def apply_random_shadow(image):
     """ Adds random shadows or ink smudges to the image. """
     h, w = image.shape[:2]
     num_shadows = random.randint(1, 3)  # Reduce the number of shadows for clarity
-    
+
     for _ in range(num_shadows):
         shadow_mask = np.zeros_like(image, dtype=np.uint8)
         center = (random.randint(0, w), random.randint(0, h))
@@ -45,7 +45,7 @@ def apply_random_shadow(image):
         angle = random.randint(0, 180)
         color = random.randint(10, 100)  # Darker shadows for realism
         cv2.ellipse(shadow_mask, center, axes, angle, 0, 360, (color, color, color), -1)
-        
+
         alpha = np.random.uniform(0.2, 0.7)  # Adjust shadow intensity
         image = cv2.addWeighted(image, 1, shadow_mask, alpha, 0)
 
@@ -56,16 +56,16 @@ def process_image(file_name, args):
     print(f"Processing {file_name}")
     img_path = os.path.join(args.src, file_name)
     xml_path = os.path.join(args.src, os.path.splitext(file_name)[0] + ".xml")
-    
+
     if not os.path.exists(xml_path):
         print(f"Skipping {file_name} (missing XML).")
         return
-    
+
     # Load image and XML
     img = cv2.imread(img_path, cv2.IMREAD_COLOR)
     tree = ET.parse(xml_path)
     root = tree.getroot()
-    
+
     # Extract text baselines from XML
     textlines = []
     for textline in root.findall(".//TextLine"):
@@ -73,11 +73,11 @@ def process_image(file_name, args):
         if baseline is not None:
             points = np.array([list(map(int, p.split(','))) for p in baseline.attrib["points"].split()])
             textlines.append((textline, points))
-    
+
     # Save original image and XML
     shutil.copy(img_path, os.path.join(args.augmented_pages, file_name))
     shutil.copy(xml_path, os.path.join(args.augmented_pages, os.path.splitext(file_name)[0] + ".xml"))
-    
+
     # Generate augmented images
     for i in range(args.augmentation_times):
         aug_img = img.copy()
@@ -91,11 +91,11 @@ def process_image(file_name, args):
             (textline, points + np.random.randint(-args.baseline_noise, args.baseline_noise + 1, size=points.shape))
             for textline, points in textlines
         ]
-        
+
         # Generate new file names
         aug_img_name = f"{os.path.splitext(file_name)[0]}_aug{i}.png"
         aug_xml_name = f"{os.path.splitext(file_name)[0]}_aug{i}.xml"
-        
+
         # Update XML baseline points
         for textline, new_coords in aug_textlines:
             textline.find("Baseline").attrib["points"] = " ".join([f"{x},{y}" for x, y in new_coords])
@@ -111,7 +111,7 @@ def augmentation(args):
     with mp.Pool(processes=args.workers) as pool:
         for _ in tqdm.tqdm(pool.starmap(process_image, files),
                            total=len(files)):
-			pass
+            pass
 
     print(f"Data augmentation completed! Augmented data saved in {args.augmented_pages}")
 

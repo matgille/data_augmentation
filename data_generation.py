@@ -20,7 +20,7 @@ def main():
     parser.set_defaults(**config)
     args = parser.parse_args()
 
-    augmentation.augmentation(args)
+    # augmentation.augmentation(args)
 
 
     polygonExtraction.polygon_extraction(args)

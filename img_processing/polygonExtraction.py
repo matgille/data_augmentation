@@ -351,7 +351,7 @@ def polygon_extraction(args):
     # Extend this list if you also use TIFF, etc.
     extensions = [".jpg", ".jpeg", ".png"]
 
-    images = [(image_path, extension, data_folder, output_folder, args)
+    images = [(image_path, extensions, data_folder, output_folder, args)
               for image_path in data_folder.iterdir()]
     with mp.Pool(processes=args.workers) as pool:
         for _ in tqdm.tqdm(pool.starmap(treat_image, images),
