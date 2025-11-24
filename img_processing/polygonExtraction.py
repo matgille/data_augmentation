@@ -359,7 +359,7 @@ def polygon_extraction(args):
             pass
 
 
-def treat_image(image_path, extension, data_folder, output_folder, args):
+def treat_image(image_path, extensions, data_folder, output_folder, args):
     if image_path.suffix.lower() in extensions and image_path.is_file():
         xml_path = data_folder / f"{image_path.stem}.xml"
         if xml_path.exists():
