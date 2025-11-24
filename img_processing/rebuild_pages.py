@@ -363,13 +363,14 @@ def rebuild_pages_by_method(base_folder="augmented_output",
 
         # ===== CASE A: there are page_key subfolders =====
         if subfolders:
+            print("CASE A")
             data = [(level1_path, page_key) for page_key in subfolders]
             with mp.Pool(processes=args.workers) as pool:
                 for _ in tqdm.tqdm(pool.starmap(page_rebuild_subfolder, data),
                                    total=len(data)):
                     pass
             continue
-
+        print("CASE B")
         # ===== CASE B: no subfolders → partition files by page_key =====
         flat_imgs = [f for f in glob(os.path.join(level1_path, "*.jpg")) if "debug overlay" not in f.lower()]
         flat_imgs += [f for f in glob(os.path.join(level1_path, "*.png")) if "debug overlay" not in f.lower()]
