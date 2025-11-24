@@ -2,8 +2,7 @@ import os
 import re
 from glob import glob
 from collections import defaultdict
-import tqdm
-import multiprocessing as mp
+
 import cv2
 import numpy as np
 import xml.etree.ElementTree as ET
@@ -221,8 +220,7 @@ def update_page_with_augmented(tree, root, subdir):
 def rebuild_pages_by_method(base_folder="augmented_output",
                             data_root="data_root_with_many_manuscripts",
                             output_folder="rebuilt_pages",
-                            augmentations=4,
-                            args=None):
+                            augmentations=4):
     """
     Rebuild pages without mixing manuscripts:
     - If the structure is <base>/<method>/<page_key>/*, rebuild per page_key.
@@ -230,16 +228,6 @@ def rebuild_pages_by_method(base_folder="augmented_output",
     """
     print("Rebuilding pages.")
     os.makedirs(output_folder, exist_ok=True)
-
-    def page_rebuild_subfolder(level1_path, page_key):
-        page_dir = os.path.join(level1_path, page_key)
-        if not os.path.isdir(page_dir):
-            return
-        imgs = [f for f in glob(os.path.join(page_dir, "*.jpg")) if "debug overlay" not in f.lower()]
-        imgs += [f for f in glob(os.path.join(page_dir, "*.png")) if "debug overlay" not in f.lower()]
-        imgs.sort()
-        # Rebuild directly if the folder is “pure” (contains only one page_key)
-        _rebuild_for_group(imgs, page_key)
 
     # Level-1: methods (e.g., bezier, L2A, affine, perspective) or leaf dirs already containing images
     for level1 in os.listdir(base_folder):
@@ -303,7 +291,7 @@ def rebuild_pages_by_method(base_folder="augmented_output",
                     return ln
                 return None  # not plausible
 
-            def treat_augmentation(augmentation_index):
+            for augmentation_index in range(augmentations):
                 canvas = np.full((H, W, 3), 255, dtype=np.uint8)
 
                 # Try direct placement by line index first, then fall back to sequential fill
@@ -360,23 +348,20 @@ def rebuild_pages_by_method(base_folder="augmented_output",
 
                 print(f"[OK] Page rebuilt '{page_key_label}' from '{level1}': {img_out} , {xml_out}")
 
-            data = [item for item in range(augmentations)]
-            with mp.Pool(processes=args.workers) as pool:
-                for _ in tqdm.tqdm(pool.starmap(treat_augmentation, data),
-                                   total=len(data)):
-                    pass
-
 
         # ===== CASE A: there are page_key subfolders =====
         if subfolders:
-            print("CASE A")
-            data = [(level1_path, page_key) for page_key in subfolders]
-            with mp.Pool(processes=args.workers) as pool:
-                for _ in tqdm.tqdm(pool.starmap(page_rebuild_subfolder, data),
-                                   total=len(data)):
-                    pass
+            for page_key in subfolders:
+                page_dir = os.path.join(level1_path, page_key)
+                if not os.path.isdir(page_dir):
+                    continue
+                imgs = [f for f in glob(os.path.join(page_dir, "*.jpg")) if "debug overlay" not in f.lower()]
+                imgs += [f for f in glob(os.path.join(page_dir, "*.png")) if "debug overlay" not in f.lower()]
+                imgs.sort()
+                # Rebuild directly if the folder is “pure” (contains only one page_key)
+                _rebuild_for_group(imgs, page_key)
             continue
-        print("CASE B")
+
         # ===== CASE B: no subfolders → partition files by page_key =====
         flat_imgs = [f for f in glob(os.path.join(level1_path, "*.jpg")) if "debug overlay" not in f.lower()]
         flat_imgs += [f for f in glob(os.path.join(level1_path, "*.png")) if "debug overlay" not in f.lower()]
@@ -387,10 +372,17 @@ def rebuild_pages_by_method(base_folder="augmented_output",
         for f in flat_imgs:
             key = infer_page_key_from_filename(os.path.basename(f)) or "unknown_page"
             buckets[key].append(f)
-        print("Rebuilding pages")
         for key, files in buckets.items():
             files.sort()
             _rebuild_for_group(files, key)
 
 
-
+    def page_rebuild_subfolder(level1_path, page_key):
+        page_dir = os.path.join(level1_path, page_key)
+        if not os.path.isdir(page_dir):
+            return
+        imgs = [f for f in glob(os.path.join(page_dir, "*.jpg")) if "debug overlay" not in f.lower()]
+        imgs += [f for f in glob(os.path.join(page_dir, "*.png")) if "debug overlay" not in f.lower()]
+        imgs.sort()
+        # Rebuild directly if the folder is “pure” (contains only one page_key)
+        _rebuild_for_group(imgs, page_key)

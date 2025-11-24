@@ -44,8 +44,7 @@ def main():
         base_folder=args.augmented_lines,
         data_root=data_root,                
         output_folder=args.rebuilt_pages,
-        augmentations=args.augmentation_times,
-        args=args
+        augmentations=args.augmentation_times
     )
 
 
