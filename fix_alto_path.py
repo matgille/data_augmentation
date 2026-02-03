@@ -11,6 +11,9 @@ def main(files):
 		basename = file.split("/")[-1].split(".")[0]
 		parsed = ET.parse(file)
 		file_name = parsed.xpath("//alto:sourceImageInformation/alto:fileName", namespaces = alto_ns)[0]
+		filename_text = file_name.text
+		if filename_text.split(".")[-1] == basename:
+			continue
 		print(file_name)
 		print(basename)
 		corresponding_image = f"{basename}.jpg"
