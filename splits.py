@@ -46,5 +46,5 @@ def main(corpus, proportions):
 if __name__ == '__main__':
 	input_corpus = sys.argv[1]
 	all_files = glob.glob(input_corpus)
-	proportions = {'train': .9, 'test': .1, 'dev': 0}
+	proportions = {'train': .8, 'test': .1, 'dev': .1}
 	main(all_files, proportions)
