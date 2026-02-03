@@ -14,10 +14,11 @@ def main(files):
 		filename_text = file_name.text
 		if filename_text.split(".")[0] == basename:
 			continue
-		print(file_name)
-		print(basename)
-		corresponding_image = f"{basename}.png"
-		file_name.text = corresponding_image
+		else:
+			print(file_name)
+			print(basename)
+			corresponding_image = f"{basename}.png"
+			file_name.text = corresponding_image
 		with open(file.replace(".xml", ".clean.xml"), "w") as output_file:
 			output_file.write(ET.tostring(parsed).decode())
 
