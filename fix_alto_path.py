@@ -12,7 +12,7 @@ def main(files):
 		parsed = ET.parse(file)
 		file_name = parsed.xpath("//alto:sourceImageInformation/alto:fileName", namespaces = alto_ns)[0]
 		filename_text = file_name.text
-		if filename_text.split(".")[-1] == basename:
+		if filename_text.split(".")[0] == basename:
 			continue
 		print(file_name)
 		print(basename)
