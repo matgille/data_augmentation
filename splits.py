@@ -7,9 +7,8 @@ import glob
 def move_files(files, target_dir):
 	for file in files:
 		basename_no_extension = file.split(".")[0]
-		for xml, image in glob.glob(f"{basename_no_extension}*"):
-			shutil.move(xml, target_dir)
-			shutil.move(image, target_dir)
+		for image_and_xml in glob.glob(f"{basename_no_extension}*"):
+			shutil.move(image_and_xml, target_dir)
 
 def main(corpus, proportions):
 
