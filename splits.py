@@ -2,10 +2,14 @@ import os
 import random
 import sys
 import shutil
+import glob
 
 def move_files(files, target_dir):
 	for file in files:
-		shutil.move(file, target_dir)
+		basename_no_extension = file.split(".")[0]
+		for xml, image in glob.glob(f"{basename_no_extension}*"):
+			shutil.move(xml, target_dir)
+			shutil.move(image, target_dir)
 
 def main(corpus, proportions):
 
@@ -28,20 +32,21 @@ def main(corpus, proportions):
 		os.makedirs(f"test")
 	except FileExistsError:
 		pass
-	move_files(test_corpus, "test")
+	move_files(test_corpus, "test/")
 	try:
 		os.makedirs(f"train")
 	except FileExistsError:
 		pass
-	move_files(train_corpus, "train")
+	move_files(train_corpus, "train/")
 	try:
 		os.makedirs(f"dev")
 	except FileExistsError:
 		pass
-	move_files(dev_corpus, "dev")
+	move_files(dev_corpus, "dev/")
 
 
 if __name__ == '__main__':
 	input_corpus = sys.argv[1]
+	all_files = glob.glob(input_corpus)
 	proportions = {'train': .9, 'test': .1, 'dev': 0}
-	main(input_corpus, proportions)
+	main(all_files, proportions)
