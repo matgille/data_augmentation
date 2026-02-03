@@ -13,7 +13,7 @@ def main(files):
 		file_name = parsed.xpath("//alto:sourceImageInformation/alto:fileName", namespaces = alto_ns)[0]
 		filename_text = file_name.text
 		if filename_text.split(".")[0] == basename:
-			continue
+			pass
 		else:
 			print(file_name)
 			print(basename)
