@@ -10,7 +10,7 @@ def main(files):
 	for file in glob.glob(files):
 		basename = file.split("/")[-1].split(".")[0]
 		parsed = ET.parse(file)
-		file_name = parsed.xpath("//alto:sourceImageInformation/alto:fileName/text()", namespaces = alto_ns)[0]
+		file_name = parsed.xpath("//alto:sourceImageInformation/alto:fileName", namespaces = alto_ns)[0]
 		print(file_name)
 		print(basename)
 		corresponding_image = f"{basename}.jpg"
