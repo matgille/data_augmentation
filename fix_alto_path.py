@@ -16,7 +16,7 @@ def main(files):
 			continue
 		print(file_name)
 		print(basename)
-		corresponding_image = f"{basename}.jpg"
+		corresponding_image = f"{basename}.png"
 		file_name.text = corresponding_image
 		with open(file.replace(".xml", ".clean.xml"), "w") as output_file:
 			output_file.write(ET.tostring(parsed).decode())
